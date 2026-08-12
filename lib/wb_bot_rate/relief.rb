@@ -72,15 +72,36 @@ module WbBotRate
     # Учётки ИИ-ботов: агенты discourse-ai плюс пользователи включённых LlmModel.
     # Здесь нельзя брать Playground.is_bot_user_id? — это просто user_id <= 0,
     # под него попадают и system (-1), и discobot (-2).
+    #
+    # Если задан wb_bot_rate_bot_usernames, список сужается до перечисленных.
+    # Именно пересечение, а не замена: настройкой можно только убавить ботов,
+    # но нельзя выдать послабление обычному пользователю.
     def ai_bot_user_ids
       return [] unless defined?(::DiscourseAi::AiBot::EntryPoint)
       return [] unless SiteSetting.respond_to?(:discourse_ai_enabled)
       return [] unless SiteSetting.discourse_ai_enabled
 
-      ::DiscourseAi::AiBot::EntryPoint.all_bot_ids.compact.uniq
+      ids = ::DiscourseAi::AiBot::EntryPoint.all_bot_ids.compact.uniq
+      return ids if ids.empty?
+
+      allowed = configured_bot_usernames
+      return ids if allowed.empty?
+
+      ids & User.where(username_lower: allowed).pluck(:id)
     rescue StandardError => e
       Discourse.warn_exception(e, message: "wb-bot-rate: не удалось получить список ботовых учёток")
       []
+    end
+
+    # Опечатка в имени приводит к пустому пересечению, то есть послабление
+    # просто выключается. Отказ в безопасную сторону — но проверяйте написание.
+    def configured_bot_usernames
+      SiteSetting
+        .wb_bot_rate_bot_usernames
+        .to_s
+        .split("|")
+        .map { |name| name.strip.downcase }
+        .reject(&:empty?)
     end
 
     # Та же развилка, что в RateLimiter::OnCreateRecord#default_rate_limiter.

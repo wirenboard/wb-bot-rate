@@ -98,6 +98,49 @@ RSpec.describe WbBotRate::Relief do
     described_class.new(post_in(bot_pm)).apply!
   end
 
+  # Сужение списка ботов. Настройкой можно только убавить набор, который вернул
+  # EntryPoint.all_bot_ids, — выдать послабление не-боту она не должна.
+  describe "wb_bot_rate_bot_usernames" do
+    fab!(:other_bot) { Fabricate(:user, trust_level: TrustLevel[4]) }
+
+    before { allow(::DiscourseAi::AiBot::EntryPoint).to receive(:all_bot_ids).and_return([bot.id, other_bot.id]) }
+
+    it "по умолчанию пусто — послабление получают все боты" do
+      expect(limiter).to receive(:rollback!).once
+      described_class.new(post_in(bot_pm)).apply!
+    end
+
+    it "откатывает, когда бот темы указан в списке" do
+      SiteSetting.wb_bot_rate_bot_usernames = bot.username
+      expect(limiter).to receive(:rollback!).once
+      described_class.new(post_in(bot_pm)).apply!
+    end
+
+    it "не откатывает, когда в списке другой бот" do
+      SiteSetting.wb_bot_rate_bot_usernames = other_bot.username
+      expect(limiter).not_to receive(:rollback!)
+      described_class.new(post_in(bot_pm)).apply!
+    end
+
+    it "не расширяет список: имя обычного человека ничего не даёт" do
+      SiteSetting.wb_bot_rate_bot_usernames = human.username
+      expect(limiter).not_to receive(:rollback!)
+      described_class.new(post_in(human_pm)).apply!
+    end
+
+    it "опечатка в имени выключает послабление" do
+      SiteSetting.wb_bot_rate_bot_usernames = "#{bot.username}_опечатка"
+      expect(limiter).not_to receive(:rollback!)
+      described_class.new(post_in(bot_pm)).apply!
+    end
+
+    it "имя сверяется без учёта регистра" do
+      SiteSetting.wb_bot_rate_bot_usernames = bot.username.upcase
+      expect(limiter).to receive(:rollback!).once
+      described_class.new(post_in(bot_pm)).apply!
+    end
+  end
+
   # Окно счётчика откатов обязано совпадать с окном самого ограничителя —
   # той же развилкой, что в RateLimiter::OnCreateRecord#default_rate_limiter.
   # Иначе потолок считался бы не за то время, за которое действует лимит.

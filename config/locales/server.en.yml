@@ -2,3 +2,4 @@ en:
   site_settings:
     wb_bot_rate_enabled: "Roll back the post rate limiter for posts created in personal messages that have an AI bot among the participants. Ordinary topics and human-to-human personal messages are untouched."
     wb_bot_rate_max_rollbacks: "Maximum number of rollbacks allowed within one rate limit window, counted per topic and user. Set to 0 to disable the relief without disabling the plugin."
+    wb_bot_rate_bot_usernames: "Bot accounts whose conversations get the relief. Empty means every AI bot on the install. The list can only narrow that set: a name that does not belong to a bot grants nothing, and a typo disables the relief entirely."

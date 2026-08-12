@@ -7,3 +7,8 @@ plugins:
     min: 0
     max: 50
     client: false
+  wb_bot_rate_bot_usernames:
+    default: ""
+    type: list
+    list_type: compact
+    client: false
